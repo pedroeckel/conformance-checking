@@ -1,0 +1,33 @@
+# Diretórios de ambiente virtual
+venv/
+.env/
+.venv/
+
+# Cache do Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Logs
+*.log
+
+# Arquivos temporários
+*.DS_Store
+*.swp
+*.swo
+
+# Arquivos do Jupyter
+.ipynb_checkpoints/
+
+# Streamlit cache
+.streamlit/
+
+# Arquivos de build
+dist/
+build/
+*.egg-info/
+
+# Arquivos locais de IDE
+.vscode/
+.idea/
