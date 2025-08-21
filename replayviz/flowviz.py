@@ -154,7 +154,7 @@ def build_nodes_edges_for_marking_N3(
                 node_type="default",
                 source_position="right",
                 target_position="left",
-                style={"border": "0", "background": "transparent", "width": lbl_w, "height": lbl_h},
+                style={"border": "0", "background": "#ffffff", "width": lbl_w, "height": lbl_h},
             )
         )
 
@@ -207,7 +207,7 @@ def build_normative_flow_N3() -> Tuple[List[StreamlitFlowNode], List[StreamlitFl
                 node_type="default",
                 source_position="right",
                 target_position="left",
-                style={"border": "0", "background": "transparent", "width": lbl_w, "height": lbl_h},
+                style={"border": "0", "background": "#ffffff", "width": lbl_w, "height": lbl_h},
             )
         )
 

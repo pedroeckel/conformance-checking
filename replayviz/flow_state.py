@@ -21,7 +21,10 @@ def update_flow_state_slot(slot: str, nodes: List[StreamlitFlowNode], edges: Lis
 
 def render_flow_slot(slot: str, key: str, height: int = 400, fit_view: bool = True) -> None:
     try:
-        new_state = streamlit_flow(key=key, state=st_ss[slot], fit_view=fit_view, height=height)
+        new_state = streamlit_flow(
+            key=key, state=st_ss[slot], fit_view=fit_view, height=height,
+            editor_style={"background": "#ffffff"},
+        )
         if new_state is not None:
             st_ss[slot] = new_state
     except TypeError:
@@ -30,4 +33,7 @@ def render_flow_slot(slot: str, key: str, height: int = 400, fit_view: bool = Tr
             nodes = state_obj.nodes; edges = state_obj.edges
         except AttributeError:
             nodes = state_obj["nodes"]; edges = state_obj["edges"]
-        streamlit_flow(key=key, nodes=nodes, edges=edges, fit_view=fit_view, height=height)
+        streamlit_flow(
+            key=key, nodes=nodes, edges=edges, fit_view=fit_view, height=height,
+            editor_style={"background": "#ffffff"},
+        )
