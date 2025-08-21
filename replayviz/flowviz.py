@@ -2,8 +2,9 @@ from typing import Dict, List, Optional, Tuple
 from pm4py.objects.petri_net.obj import PetriNet, Marking
 from streamlit_flow.elements import StreamlitFlowNode, StreamlitFlowEdge
 
-# Subtítulos (descrições) sob cada transição, como na figura
-TRANS_DESCR = {
+# Subtitles (descriptions) under each transition. External callers may
+# provide their own mapping; this serves only as a default example.
+DEFAULT_TRANS_DESCR: Dict[str, str] = {
     "a": "register\nrequest",
     "c": "examine\ncasually",
     "d": "check\nticket",
@@ -47,135 +48,165 @@ def _label_under(text: str) -> str:
     tx = text.replace("\n", "<br/>")
     return f"<div style='text-align:center;font-size:12px;line-height:14px;color:#111827'>{tx}</div>"
 
-def _layout_coords():
-    """
-    Coordenadas fixas para N₃ (em px), para bater com a estética do diagrama:
-    linha superior:  p_start — a — p1 — c — p3 ——\
-                                             \     e — p5 — h — p_end
-    linha inferior:              p2 — d — p4 ——/
-    """
+def default_layout() -> Dict[str, Tuple[int, int]]:
+    """Example coordinates for a simple Petri net (in pixels)."""
     return {
-        # y=60 (linha média), y=20 (topo), y=100 (baixo)
-        "p_start": (  0, 60),
-        "a":       ( 80, 60),
-        "p1":      (160, 20),
-        "p2":      (160,100),
-        "c":       (240, 20),
-        "d":       (240,100),
-        "p3":      (320, 20),
-        "p4":      (320,100),
-        "e":       (420, 60),
-        "p5":      (500, 60),
-        "h":       (580, 60),
-        "p_end":   (660, 60),
+        # y=60 (middle line), y=20 (top), y=100 (bottom)
+        "p_start": (0, 60),
+        "a": (80, 60),
+        "p1": (160, 20),
+        "p2": (160, 100),
+        "c": (240, 20),
+        "d": (240, 100),
+        "p3": (320, 20),
+        "p4": (320, 100),
+        "e": (420, 60),
+        "p5": (500, 60),
+        "h": (580, 60),
+        "p_end": (660, 60),
     }
 
-def build_nodes_edges_for_marking_N3(
+def build_nodes_edges_for_marking(
     net: PetriNet,
-    places: Dict[str, PetriNet.Place],
-    trans: Dict[str, PetriNet.Transition],
     marking: Marking,
     fired_transition_name: Optional[str],
     prev_marking: Optional[Marking] = None,
+    layout: Dict[str, Tuple[int, int]] | None = None,
+    trans_descr: Dict[str, str] | None = None,
 ) -> Tuple[List[StreamlitFlowNode], List[StreamlitFlowEdge]]:
-    pos = _layout_coords()
+    layout = layout or {}
+    trans_descr = trans_descr or {}
 
-    # consumo/produção
     consumed, produced = {}, {}
     if prev_marking is not None:
-        for name, p in places.items():
+        for p in net.places:
+            name = p.name
             k_prev = prev_marking.get(p, 0)
-            k_now  = marking.get(p, 0)
-            consumed[name] = (k_now < k_prev)
-            produced[name] = (k_now > k_prev)
+            k_now = marking.get(p, 0)
+            consumed[name] = k_now < k_prev
+            produced[name] = k_now > k_prev
 
     nodes: List[StreamlitFlowNode] = []
-
-    # places (círculos pequenos) com bolinhas
-    for pname in ["p_start","p1","p2","p3","p4","p5","p_end"]:
-        p = places[pname]; k = marking.get(p, 0)
+    for p in net.places:
+        name = p.name
+        pos = layout.get(name, (0, 0))
+        k = marking.get(p, 0)
         nodes.append(
             StreamlitFlowNode(
-                id=pname,
-                pos=pos[pname],
+                id=name,
+                pos=pos,
                 data={"content": _token_html(k)},
                 node_type="default",
-                source_position="right", target_position="left",
-                style=_place_style(k, consumed=consumed.get(pname, False), produced=produced.get(pname, False))
+                source_position="right",
+                target_position="left",
+                style=_place_style(k, consumed=consumed.get(name, False), produced=produced.get(name, False)),
             )
         )
 
-    # transitions (caixinhas) + rótulo inferior igual à figura
-    for tname in ["a","c","d","e","h"]:
-        t = trans[tname]; hl = (fired_transition_name == tname)
+    for t in net.transitions:
+        name = t.name
+        pos = layout.get(name, (0, 0))
+        hl = fired_transition_name == name
         nodes.append(
             StreamlitFlowNode(
-                id=tname, pos=pos[tname],
-                data={"content": f"<div><b>{tname}</b></div>"},
-                node_type="default", source_position="right", target_position="left",
-                style=_trans_style(highlighted=hl)
+                id=name,
+                pos=pos,
+                data={"content": f"<div><b>{name}</b></div>"},
+                node_type="default",
+                source_position="right",
+                target_position="left",
+                style=_trans_style(highlighted=hl),
             )
         )
-        # label embaixo
         nodes.append(
             StreamlitFlowNode(
-                id=f"{tname}_lbl",
-                pos=(pos[tname][0], pos[tname][1] + 40),  # logo abaixo
-                data={"content": _label_under(TRANS_DESCR.get(tname, tname))},
-                node_type="default", source_position="right", target_position="left",
-                style={"border":"0","background":"transparent","width":120,"height":30}
+                id=f"{name}_lbl",
+                pos=(pos[0], pos[1] + 40),
+                data={"content": _label_under(trans_descr.get(t.label or name, t.label or name))},
+                node_type="default",
+                source_position="right",
+                target_position="left",
+                style={"border": "0", "background": "transparent", "width": 120, "height": 30},
             )
         )
 
-    # edges conforme N₃
     edges: List[StreamlitFlowEdge] = []
-    def E(src, dst):
-        edges.append(StreamlitFlowEdge(id=f"e_{src}_{dst}", source=src, target=dst, label="", animated=False))
-
-    E("p_start","a"); E("a","p1"); E("a","p2")
-    E("p1","c"); E("c","p3")
-    E("p2","d"); E("d","p4")
-    E("p3","e"); E("p4","e")
-    E("e","p5"); E("p5","h"); E("h","p_end")
-
+    for arc in net.arcs:
+        src = arc.source.name
+        dst = arc.target.name
+        edges.append(
+            StreamlitFlowEdge(
+                id=f"e_{src}_{dst}",
+                source=src,
+                target=dst,
+                label="",
+                animated=False,
+            )
+        )
     return nodes, edges
 
-# Modelo normativo equivalente (mesmo layout e rótulos “humanos”)
-def build_normative_flow_N3() -> Tuple[List[StreamlitFlowNode], List[StreamlitFlowEdge]]:
-    pos = _layout_coords()
+# Build a static representation of a net using given layout and labels
+
+def build_normative_flow(
+    net: PetriNet,
+    layout: Dict[str, Tuple[int, int]],
+    trans_descr: Dict[str, str],
+) -> Tuple[List[StreamlitFlowNode], List[StreamlitFlowEdge]]:
     nodes: List[StreamlitFlowNode] = []
     edges: List[StreamlitFlowEdge] = []
 
-    def add_circle(pid):
-        nodes.append(StreamlitFlowNode(
-            id=f"norm_{pid}", pos=pos[pid], data={"content": ""}, node_type="default",
-            source_position="right", target_position="left",
-            style={"border":"2px solid #6b7280","borderRadius":"9999px","width":28,"height":28,"background":"#fff"}
-        ))
+    for p in net.places:
+        name = p.name
+        if name in layout:
+            nodes.append(
+                StreamlitFlowNode(
+                    id=f"norm_{name}",
+                    pos=layout[name],
+                    data={"content": ""},
+                    node_type="default",
+                    source_position="right",
+                    target_position="left",
+                    style={"border": "2px solid #6b7280", "borderRadius": "9999px", "width": 28, "height": 28, "background": "#fff"},
+                )
+            )
 
-    def add_box(tid):
-        nodes.append(StreamlitFlowNode(
-            id=f"norm_{tid}", pos=pos[tid], data={"content": f"<div><b>{tid}</b></div>"},
-            node_type="default", source_position="right", target_position="left",
-            style={"border":"2px solid #111827","borderRadius":"4px","width":34,"height":34,"background":"#fff","fontWeight":700}
-        ))
-        nodes.append(StreamlitFlowNode(
-            id=f"norm_{tid}_lbl",
-            pos=(pos[tid][0], pos[tid][1] + 40),
-            data={"content": _label_under(TRANS_DESCR.get(tid, tid))},
-            node_type="default", source_position="right", target_position="left",
-            style={"border":"0","background":"transparent","width":120,"height":30}
-        ))
+    for t in net.transitions:
+        name = t.name
+        if name in layout:
+            nodes.append(
+                StreamlitFlowNode(
+                    id=f"norm_{name}",
+                    pos=layout[name],
+                    data={"content": f"<div><b>{name}</b></div>"},
+                    node_type="default",
+                    source_position="right",
+                    target_position="left",
+                    style={"border": "2px solid #111827", "borderRadius": "4px", "width": 34, "height": 34, "background": "#fff", "fontWeight": 700},
+                )
+            )
+            nodes.append(
+                StreamlitFlowNode(
+                    id=f"norm_{name}_lbl",
+                    pos=(layout[name][0], layout[name][1] + 40),
+                    data={"content": _label_under(trans_descr.get(t.label or name, t.label or name))},
+                    node_type="default",
+                    source_position="right",
+                    target_position="left",
+                    style={"border": "0", "background": "transparent", "width": 120, "height": 30},
+                )
+            )
 
-    for pid in ["p_start","p1","p2","p3","p4","p5","p_end"]: add_circle(pid)
-    for tid in ["a","c","d","e","h"]: add_box(tid)
-
-    def E(src,dst):
-        edges.append(StreamlitFlowEdge(id=f"ne_{src}_{dst}", source=f"norm_{src}", target=f"norm_{dst}", label="", animated=False))
-    E("p_start","a"); E("a","p1"); E("a","p2")
-    E("p1","c"); E("c","p3")
-    E("p2","d"); E("d","p4")
-    E("p3","e"); E("p4","e")
-    E("e","p5"); E("p5","h"); E("h","p_end")
-
+    for arc in net.arcs:
+        src = arc.source.name
+        dst = arc.target.name
+        if src in layout and dst in layout:
+            edges.append(
+                StreamlitFlowEdge(
+                    id=f"ne_{src}_{dst}",
+                    source=f"norm_{src}",
+                    target=f"norm_{dst}",
+                    label="",
+                    animated=False,
+                )
+            )
     return nodes, edges

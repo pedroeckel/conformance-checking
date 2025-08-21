@@ -2,10 +2,11 @@ from typing import Dict, Tuple
 from pm4py.objects.log.obj import EventLog, Trace, Event
 from pm4py.objects.petri_net.obj import PetriNet, Marking
 from pm4py.objects.petri_net.utils import petri_utils
+from pm4py.objects.petri_net.importer import importer as pnml_importer
 
 def build_tiny_log() -> EventLog:
     log = EventLog()
-    # Exemplos simples coerentes com N₃
+    # Exemplos simples coerentes com a rede de exemplo
     # a c d e h
     t1 = Trace([Event({"concept:name": "a"}),
                 Event({"concept:name": "c"}),
@@ -22,14 +23,32 @@ def build_tiny_log() -> EventLog:
         log.append(tr)
     return log
 
-def build_net_N3() -> Tuple[
+
+def build_net_from_file(path: str) -> Tuple[
     PetriNet, Marking, Marking, Dict[str, PetriNet.Place], Dict[str, PetriNet.Transition]
 ]:
+    """Load a Petri net from an external file.
+
+    Parameters
+    ----------
+    path: str
+        Path to a PNML file describing the net.
+
+    Returns
+    -------
+    Tuple containing the net itself, initial and final markings and
+    dictionaries mapping place/transition names to their objects.
     """
-    N₃ (start) — a — (split) — c/d — (join) — e — p5 — h — (end)
-    AND-split após 'a' (produz p1 e p2). AND-join em 'e' (requer p3 e p4).
-    """
-    net = PetriNet("N3")
+    net, im, fm = pnml_importer.apply(path)
+    places = {p.name: p for p in net.places}
+    trans = {t.name: t for t in net.transitions}
+    return net, im, fm, places, trans
+
+def build_example_net() -> Tuple[
+    PetriNet, Marking, Marking, Dict[str, PetriNet.Place], Dict[str, PetriNet.Transition]
+]:
+    """Small example net with a parallel branch and a join."""
+    net = PetriNet("example")
 
     # places
     p_start = PetriNet.Place("p_start")
