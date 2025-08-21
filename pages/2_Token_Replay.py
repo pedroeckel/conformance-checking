@@ -1,7 +1,9 @@
 # -*- coding: utf-8 -*-
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional, Union
+import io
 import streamlit as st
 import pandas as pd
+from pm4py.objects.log.obj import EventLog
 from pm4py.algo.conformance.tokenreplay import algorithm as token_based_replay
 
 from replayviz.pm4py_model import build_tiny_log, build_net_N3
@@ -16,10 +18,30 @@ from replayviz import (
 st.set_page_config(page_title="Token Replay — N₃", layout="wide")
 st.title("Token-Based Replay (N₃) — normativo acima, Petri com fichas abaixo")
 
+@st.cache_data
+def load_event_log(src: Optional[Union[str, bytes]]) -> EventLog:
+    if isinstance(src, bytes):
+        return build_tiny_log(io.BytesIO(src))
+    if isinstance(src, str) and src:
+        return build_tiny_log(src)
+    return build_tiny_log()
+
+st.subheader("Seleção do Log")
+uploaded = st.file_uploader(
+    "Arquivo de log (XES)", type=["xes"],
+    help="Deixe vazio para utilizar o log de exemplo embutido",
+)
+path_input = st.text_input("Ou caminho para um log existente", "")
+src: Optional[Union[str, bytes]] = None
+if uploaded is not None:
+    src = uploaded.getvalue()
+elif path_input:
+    src = path_input
+log = load_event_log(src)
+
 # Sidebar: apenas escolha de traço
 with st.sidebar:
     st.header("Parâmetros do Replay")
-    log = build_tiny_log()
     trace_idx = st.selectbox("Trace", options=list(range(1, len(log)+1)), index=0) - 1
 
 # Modelo N₃
