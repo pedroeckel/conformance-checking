@@ -1,9 +1,21 @@
-from typing import Dict, Tuple
+from typing import Dict, Tuple, Union, Optional, IO
 from pm4py.objects.log.obj import EventLog, Trace, Event
 from pm4py.objects.petri_net.obj import PetriNet, Marking
 from pm4py.objects.petri_net.utils import petri_utils
+from pm4py.objects.log.importer.xes import importer as xes_importer
 
-def build_tiny_log() -> EventLog:
+def build_tiny_log(log: Optional[Union[str, IO, EventLog]] = None) -> EventLog:
+    """Return an :class:`EventLog`.
+
+    When ``log`` is provided, it can either be a path to a log, a file-like
+    object or an :class:`EventLog` instance. In such cases the provided log is
+    returned/loaded instead of creating the bundled tiny example.
+    """
+    if log is not None:
+        if isinstance(log, EventLog):
+            return log
+        return xes_importer.apply(log)
+
     log = EventLog()
     # Exemplos simples coerentes com N₃
     # a c d e h
