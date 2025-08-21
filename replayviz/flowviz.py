@@ -12,10 +12,11 @@ TRANS_DESCR = {
 }
 
 def _token_html(k: int, max_dots: int = 6) -> str:
-    if k <= 0: return ""
+    if k <= 0:
+        return ""
     if k <= max_dots:
         return "<span>" + ("&bull; " * k).strip() + "</span>"
-    return "<span>" + ("&bull; " * max_dots).strip() + f" <strong>+{k-max_dots}</strong></span>"
+    return "<span>" + ("&bull; " * max_dots).strip() + f" <strong>+{k - max_dots}</strong></span>"
 
 def _place_style(tokens: int, consumed=False, produced=False) -> dict:
     border = "#6b7280"; bg = "#ffffff"
@@ -30,22 +31,44 @@ def _place_style(tokens: int, consumed=False, produced=False) -> dict:
         "lineHeight": "12px", "padding": "2px",
     }
 
-def _trans_style(highlighted: bool = False) -> dict:
-    border = "#111827"; bg = "#ffffff"
-    if highlighted: border, bg = "#ef4444", "#fee2e2"
+def _calc_text_box(text: str, char_w: int = 8, padding: int = 12, min_w: int = 34) -> int:
+    """Estimate a box width (in px) from its text content."""
+    lines = text.split("\n")
+    content_w = max(len(line) for line in lines) * char_w + padding
+    return max(min_w, content_w)
+
+
+def _trans_style(name: str, highlighted: bool = False) -> dict:
+    border = "#111827"
+    bg = "#ffffff"
+    if highlighted:
+        border, bg = "#ef4444", "#fee2e2"
+    width = _calc_text_box(name)
     return {
         "border": f"2px solid {border}",
         "borderRadius": "4px",
-        "width": 34, "height": 34,
-        "display": "flex", "alignItems": "center", "justifyContent": "center",
-        "background": bg, "color": "#111827", "fontWeight": 700,
+        "width": width,
+        "height": 34,
+        "display": "flex",
+        "alignItems": "center",
+        "justifyContent": "center",
+        "background": bg,
+        "color": "#111827",
+        "fontWeight": 700,
         "boxShadow": "0 0 0 0",
+        "padding": "0 4px",
     }
 
-def _label_under(text: str) -> str:
-    # dois níveis: id (negrito) em cima, descrição pequena em baixo (quebra de linha com <br/>)
-    tx = text.replace("\n", "<br/>")
-    return f"<div style='text-align:center;font-size:12px;line-height:14px;color:#111827'>{tx}</div>"
+def _label_under(text: str) -> Tuple[str, int, int]:
+    """HTML for a small label under a transition plus its preferred size."""
+    lines = text.split("\n")
+    tx = "<br/>".join(lines)
+    width = _calc_text_box(text, char_w=6, padding=6, min_w=0)
+    height = max(14 * len(lines), 14)
+    html = (
+        f"<div style='text-align:center;font-size:12px;line-height:14px;color:#111827'>{tx}</div>"
+    )
+    return html, width, height
 
 def _layout_coords():
     """
@@ -106,24 +129,32 @@ def build_nodes_edges_for_marking_N3(
         )
 
     # transitions (caixinhas) + rótulo inferior igual à figura
-    for tname in ["a","c","d","e","h"]:
-        t = trans[tname]; hl = (fired_transition_name == tname)
+    for tname in ["a", "c", "d", "e", "h"]:
+        hl = (fired_transition_name == tname)
+        t_style = _trans_style(tname, highlighted=hl)
         nodes.append(
             StreamlitFlowNode(
-                id=tname, pos=pos[tname],
+                id=tname,
+                pos=pos[tname],
                 data={"content": f"<div><b>{tname}</b></div>"},
-                node_type="default", source_position="right", target_position="left",
-                style=_trans_style(highlighted=hl)
+                node_type="default",
+                source_position="right",
+                target_position="left",
+                style=t_style,
             )
         )
         # label embaixo
+        lbl_html, lbl_w, lbl_h = _label_under(TRANS_DESCR.get(tname, tname))
+        lbl_x = pos[tname][0] + (t_style["width"] - lbl_w) / 2
         nodes.append(
             StreamlitFlowNode(
                 id=f"{tname}_lbl",
-                pos=(pos[tname][0], pos[tname][1] + 40),  # logo abaixo
-                data={"content": _label_under(TRANS_DESCR.get(tname, tname))},
-                node_type="default", source_position="right", target_position="left",
-                style={"border":"0","background":"transparent","width":120,"height":30}
+                pos=(lbl_x, pos[tname][1] + 40),  # logo abaixo
+                data={"content": lbl_html},
+                node_type="default",
+                source_position="right",
+                target_position="left",
+                style={"border": "0", "background": "transparent", "width": lbl_w, "height": lbl_h},
             )
         )
 
@@ -154,18 +185,31 @@ def build_normative_flow_N3() -> Tuple[List[StreamlitFlowNode], List[StreamlitFl
         ))
 
     def add_box(tid):
-        nodes.append(StreamlitFlowNode(
-            id=f"norm_{tid}", pos=pos[tid], data={"content": f"<div><b>{tid}</b></div>"},
-            node_type="default", source_position="right", target_position="left",
-            style={"border":"2px solid #111827","borderRadius":"4px","width":34,"height":34,"background":"#fff","fontWeight":700}
-        ))
-        nodes.append(StreamlitFlowNode(
-            id=f"norm_{tid}_lbl",
-            pos=(pos[tid][0], pos[tid][1] + 40),
-            data={"content": _label_under(TRANS_DESCR.get(tid, tid))},
-            node_type="default", source_position="right", target_position="left",
-            style={"border":"0","background":"transparent","width":120,"height":30}
-        ))
+        t_style = _trans_style(tid, highlighted=False)
+        nodes.append(
+            StreamlitFlowNode(
+                id=f"norm_{tid}",
+                pos=pos[tid],
+                data={"content": f"<div><b>{tid}</b></div>"},
+                node_type="default",
+                source_position="right",
+                target_position="left",
+                style=t_style,
+            )
+        )
+        lbl_html, lbl_w, lbl_h = _label_under(TRANS_DESCR.get(tid, tid))
+        lbl_x = pos[tid][0] + (t_style["width"] - lbl_w) / 2
+        nodes.append(
+            StreamlitFlowNode(
+                id=f"norm_{tid}_lbl",
+                pos=(lbl_x, pos[tid][1] + 40),
+                data={"content": lbl_html},
+                node_type="default",
+                source_position="right",
+                target_position="left",
+                style={"border": "0", "background": "transparent", "width": lbl_w, "height": lbl_h},
+            )
+        )
 
     for pid in ["p_start","p1","p2","p3","p4","p5","p_end"]: add_circle(pid)
     for tid in ["a","c","d","e","h"]: add_box(tid)
