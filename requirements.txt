@@ -1,0 +1,4 @@
+streamlit>=1.31
+pm4py>=2.7
+streamlit-flow  # conforme o nome/versão usado no seu ambiente
+pandas>=2.0
