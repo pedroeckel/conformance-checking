@@ -1,10 +1,10 @@
 # -*- coding: utf-8 -*-
 from typing import Any, Dict, List, Optional, Union
-import io
 import streamlit as st
 import pandas as pd
-from pm4py.objects.log.obj import EventLog
+
 from pm4py.algo.conformance.tokenreplay import algorithm as token_based_replay
+from pm4py.objects.log.obj import EventLog
 
 from replayviz.pm4py_model import build_tiny_log, build_net_N3
 from replayviz import (
@@ -12,52 +12,82 @@ from replayviz import (
     ensure_flow_state_slot, update_flow_state_slot, render_flow_slot,
 )
 from replayviz.flowviz import build_normative_flow_N3, build_nodes_edges_for_marking_N3
+from replayviz.utils_xes import read_xes_any  # <- leitor robusto (path/bytes)
 
 st.set_page_config(page_title="Token Replay — N₃", layout="wide")
 st.title("Token-Based Replay (N₃) — normativo acima, Petri com fichas abaixo")
 
-@st.cache_data
-def load_event_log(src: Optional[Union[str, bytes]]) -> EventLog:
-    if isinstance(src, bytes):
-        return build_tiny_log(io.BytesIO(src))
-    if isinstance(src, str) and src:
-        return build_tiny_log(src)
-    return build_tiny_log()
+# -----------------------------
+# Leitura de log (robusta)
+# -----------------------------
+@st.cache_data(show_spinner=False)
+def load_event_log_any(src: Optional[Union[str, bytes]]) -> EventLog:
+    """
+    - Se src for None -> retorna log sintético padrão (demo).
+    - Se src for str  -> interpreta como caminho e lê via PM4Py.
+    - Se src for bytes-> salva temporário (.xes/.xes.gz) e lê via PM4Py.
+    """
+    if src is None:
+        return build_tiny_log()
+    return read_xes_any(src)
 
 st.subheader("Seleção do Log")
-uploaded = st.file_uploader(
-    "Arquivo de log (XES)", type=["xes"],
-    help="Deixe vazio para utilizar o log de exemplo embutido",
-)
+uploaded = st.file_uploader("Carregue um XES", type=["xes", "xes.gz"])
 path_input = st.text_input("Ou caminho para um log existente", "")
-src: Optional[Union[str, bytes]] = None
-if uploaded is not None:
-    src = uploaded.getvalue()
-elif path_input:
-    src = path_input
-log = load_event_log(src)
 
-# Sidebar: apenas escolha de traço
+# Fonte escolhida
+src: Optional[Union[str, bytes]]
+if uploaded is not None:
+    # importante: use BYTES, não BytesIO
+    src = uploaded.getvalue()
+elif path_input.strip():
+    src = path_input.strip()  # caminho no servidor
+else:
+    src = None  # usa log de demonstração
+
+# Carrega com cache
+try:
+    log: EventLog = load_event_log_any(src)
+    if src is None:
+        st.info(f"Usando log de demonstração (traços: {len(log)})")
+    else:
+        st.success(f"Log carregado (traços: {len(log)})")
+except Exception as e:
+    st.error(f"Falha ao carregar o log: {e}")
+    st.stop()
+
+# -----------------------------
+# Parâmetros do replay
+# -----------------------------
 with st.sidebar:
     st.header("Parâmetros do Replay")
     trace_idx = st.selectbox("Trace", options=list(range(1, len(log)+1)), index=0) - 1
 
-# Modelo N₃
+# Modelo N₃ (rede de Petri)
 net, im, fm, places, trans = build_net_N3()
 replay_result = token_based_replay.apply(log, net, im, fm)
 
+# Sequência de marcações para o traço selecionado
 seq = markings_along_trace(net, im, log[trace_idx], trans)
 max_step = seq[-1][0] if seq else 0
 
-if "frame" not in st.session_state: st.session_state.frame = 0
-if "last_params" not in st.session_state: st.session_state.last_params = None
+# Estado do passo (manual)
+if "frame" not in st.session_state:
+    st.session_state.frame = 0
+if "last_params" not in st.session_state:
+    st.session_state.last_params = None
+
 curr_params = (trace_idx, max_step)
 if st.session_state.last_params != curr_params:
     st.session_state.last_params = curr_params
     st.session_state.frame = 0
+
+# Limita antes de instanciar o widget
 st.session_state.frame = max(0, min(st.session_state.frame, max_step))
 
-# 1) Normativo N₃ (topo)
+# -----------------------------
+# 1) Normativo N₃ (alto nível)
+# -----------------------------
 st.subheader("Modelo normativo (referência)")
 n_nodes, n_edges = build_normative_flow_N3()
 ensure_flow_state_slot("flow_norm_on_replay_page")
@@ -66,13 +96,19 @@ render_flow_slot("flow_norm_on_replay_page", key="norm_replay_page", height=260,
 
 st.markdown("---")
 
-# 2) Controles + Petri com fichas (abaixo)
+# -----------------------------
+# 2) Controles + Petri com fichas
+# -----------------------------
 st.subheader("Controles (somente manual)")
-c1, c2, c3 = st.columns([1,1,1])
-if c1.button("⏮ Prev"):  st.session_state.frame = max(0, st.session_state.frame - 1)
-if c2.button("⏭ Next"):  st.session_state.frame = min(max_step, st.session_state.frame + 1)
-if c3.button("⟲ Reset"): st.session_state.frame = 0
+c1, c2, c3 = st.columns([1, 1, 1])
+if c1.button("⏮ Prev"):
+    st.session_state.frame = max(0, st.session_state.frame - 1)
+if c2.button("⏭ Next"):
+    st.session_state.frame = min(max_step, st.session_state.frame + 1)
+if c3.button("⟲ Reset"):
+    st.session_state.frame = 0
 
+# Slider (não reatribuir frame depois do widget)
 st.slider("Passo", 0, max_step, key="frame", help="0 = estado inicial")
 
 st.subheader(f"Replay do Trace {trace_idx+1} — passo {st.session_state.frame}/{max_step}")
@@ -86,7 +122,6 @@ nodes, edges = build_nodes_edges_for_marking_N3(
     fired_transition_name=(fired_name if st.session_state.frame > 0 else None),
     prev_marking=prev_marking
 )
-
 ensure_flow_state_slot("flow_trace_vertical_n3")
 update_flow_state_slot("flow_trace_vertical_n3", nodes, edges)
 render_flow_slot("flow_trace_vertical_n3", key="trace_vertical_n3", height=360, fit_view=True)
@@ -98,8 +133,11 @@ st.markdown(badge + " &nbsp;&nbsp;|&nbsp;&nbsp; " + fired_txt)
 st.markdown(f"Marcação atual: `{format_marking(marking)}`")
 st.markdown(f"Marcação final requerida: `{format_marking(fm)}`")
 
-# Métricas
+# -----------------------------
+# 3) Métricas do Token-Based Replay
+# -----------------------------
 st.subheader("Métricas do Token-Based Replay")
+
 def _scalar(x): return "—" if x is None else x
 def _name(obj) -> str: return getattr(obj, "name", str(obj))
 def _fmt_marking_like(val) -> str:
