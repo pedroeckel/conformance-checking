@@ -2,15 +2,6 @@ from typing import Dict, List, Optional, Tuple
 from pm4py.objects.petri_net.obj import PetriNet, Marking
 from streamlit_flow.elements import StreamlitFlowNode, StreamlitFlowEdge
 
-# Subtítulos (descrições) sob cada transição, como na figura
-TRANS_DESCR = {
-    "a": "register\nrequest",
-    "c": "examine\ncasually",
-    "d": "check\nticket",
-    "e": "decide",
-    "h": "reject\nrequest",
-}
-
 def _token_html(k: int, max_dots: int = 6) -> str:
     if k <= 0:
         return ""
@@ -143,20 +134,6 @@ def build_nodes_edges_for_marking_N3(
                 style=t_style,
             )
         )
-        # label embaixo
-        lbl_html, lbl_w, lbl_h = _label_under(TRANS_DESCR.get(tname, tname))
-        lbl_x = pos[tname][0] + (t_style["width"] - lbl_w) / 2
-        nodes.append(
-            StreamlitFlowNode(
-                id=f"{tname}_lbl",
-                pos=(lbl_x, pos[tname][1] + 40),  # logo abaixo
-                data={"content": lbl_html},
-                node_type="default",
-                source_position="right",
-                target_position="left",
-                style={"border": "0", "background": "#ffffff", "width": lbl_w, "height": lbl_h},
-            )
-        )
 
     # edges conforme N₃
     edges: List[StreamlitFlowEdge] = []
@@ -197,19 +174,7 @@ def build_normative_flow_N3() -> Tuple[List[StreamlitFlowNode], List[StreamlitFl
                 style=t_style,
             )
         )
-        lbl_html, lbl_w, lbl_h = _label_under(TRANS_DESCR.get(tid, tid))
-        lbl_x = pos[tid][0] + (t_style["width"] - lbl_w) / 2
-        nodes.append(
-            StreamlitFlowNode(
-                id=f"norm_{tid}_lbl",
-                pos=(lbl_x, pos[tid][1] + 40),
-                data={"content": lbl_html},
-                node_type="default",
-                source_position="right",
-                target_position="left",
-                style={"border": "0", "background": "#ffffff", "width": lbl_w, "height": lbl_h},
-            )
-        )
+        
 
     for pid in ["p_start","p1","p2","p3","p4","p5","p_end"]: add_circle(pid)
     for tid in ["a","c","d","e","h"]: add_box(tid)
