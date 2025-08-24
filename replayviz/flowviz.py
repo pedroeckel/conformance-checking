@@ -1,5 +1,6 @@
 from typing import Dict, List, Optional, Tuple
 from pm4py.objects.petri_net.obj import PetriNet, Marking
+from pm4py.objects.log.obj import Trace
 from streamlit_flow.elements import StreamlitFlowNode, StreamlitFlowEdge
 
 def _token_html(k: int, max_dots: int = 6) -> str:
@@ -188,3 +189,89 @@ def build_normative_flow_N3() -> Tuple[List[StreamlitFlowNode], List[StreamlitFl
     E("e","p5"); E("p5","h"); E("h","p_end")
 
     return nodes, edges
+
+
+# Traço sequencial simples (start -> eventos -> end)
+def build_trace_flow(trace: Trace) -> Tuple[List[StreamlitFlowNode], List[StreamlitFlowEdge]]:
+    nodes: List[StreamlitFlowNode] = []
+    edges: List[StreamlitFlowEdge] = []
+
+    circle_style = {
+        "border": "2px solid #6b7280",
+        "borderRadius": "9999px",
+        "width": 28,
+        "height": 28,
+        "background": "#fff",
+    }
+
+    y = 60
+    x = 0
+
+    # start
+    nodes.append(
+        StreamlitFlowNode(
+            id="start",
+            pos=(x, y),
+            data={"content": ""},
+            node_type="default",
+            source_position="right",
+            target_position="left",
+            style=circle_style,
+        )
+    )
+
+    prev_id = "start"
+
+    # eventos sequenciais
+    for i, ev in enumerate(trace, start=1):
+        x += 80
+        name = ev.get("concept:name", "?")
+        node_id = f"ev_{i}"
+        t_style = _trans_style(name, highlighted=False)
+        nodes.append(
+            StreamlitFlowNode(
+                id=node_id,
+                pos=(x, y),
+                data={"content": f"<div><b>{name}</b></div>"},
+                node_type="default",
+                source_position="right",
+                target_position="left",
+                style=t_style,
+            )
+        )
+        edges.append(
+            StreamlitFlowEdge(
+                id=f"e_{prev_id}_{node_id}",
+                source=prev_id,
+                target=node_id,
+                label="",
+                animated=False,
+            )
+        )
+        prev_id = node_id
+
+    # end
+    x += 80
+    nodes.append(
+        StreamlitFlowNode(
+            id="end",
+            pos=(x, y),
+            data={"content": ""},
+            node_type="default",
+            source_position="right",
+            target_position="left",
+            style=circle_style,
+        )
+    )
+    edges.append(
+        StreamlitFlowEdge(
+            id=f"e_{prev_id}_end",
+            source=prev_id,
+            target="end",
+            label="",
+            animated=False,
+        )
+    )
+
+    return nodes, edges
+
