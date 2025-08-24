@@ -20,4 +20,7 @@ from .flow_state import (
     ensure_flow_state_slot, update_flow_state_slot, render_flow_slot
 )
 
+# Geração de logs XES
+from .loggen import build_xes_from_frequencies
+
 from .utils_xes import read_xes_any
