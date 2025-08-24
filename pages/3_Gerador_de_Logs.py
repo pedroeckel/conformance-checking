@@ -22,8 +22,25 @@ h: reject request"""
 
 default_freqs = """455, (a, c, d, e, h)
 191, (a, b, d, e, g)
-177, (a, d, e, g)
+177, (a, d, c, e, h)
 144, (a, b, d, e, h)
+111, (a, c, d, e, g)
+ 82, (a, d, c, e, g)
+ 56, (a, d, b, e, h)
+ 47, (a, c, d, e, f, d, b, e, h)
+ 38, (a, d, b, e, g)
+ 33, (a, c, d, e, f, b, d, e, h)
+ 14, (a, c, d, e, f, b, d, e, g)
+ 11, (a, c, d, e, f, d, b, e, g)
+  9, (a, d, c, e, f, c, d, e, h)
+  8, (a, d, c, e, f, d, b, e, h)
+  5, (a, d, c, e, f, b, d, e, g)
+  3, (a, c, d, e, f, b, d, e, f, d, b, e, g)
+  2, (a, d, c, e, f, d, b, e, g)
+  2, (a, d, c, e, f, b, d, e, f, b, d, e, g)
+  1, (a, d, c, e, f, d, b, e, f, b, d, e, h)
+  1, (a, d, b, e, f, b, d, e, f, d, b, e, g)
+  1, (a, d, c, e, f, d, b, e, f, c, d, e, f, d, b, e, g)
 """
 
 

@@ -43,7 +43,7 @@ def build_xes_from_frequencies(
     base_time: datetime | None = None,
     delta_between_cases: timedelta = timedelta(minutes=3),
     delta_between_events: timedelta = timedelta(seconds=15),
-    case_prefix: str = "σ",
+    case_prefix: str = "case_",
     keep_activity_letters_in_concept_name: bool = True,
 ) -> EventLog:
     rows = _normalize_freq_table(freq_table)
