@@ -8,6 +8,7 @@ st.title("Gerador de Logs XES/CSV")
 
 st.markdown(
     "Forneça rótulos de atividades e uma tabela de frequências de traços para gerar um log sintético e baixá-lo em XES ou CSV."
+
 )
 
 default_labels = """a: register request
@@ -79,4 +80,5 @@ if st.button("Gerar Log"):
     with open(out_path, "rb") as f:
         st.download_button("Baixar XES", data=f.read(), file_name=out_path)
     st.download_button("Baixar CSV", data=csv_bytes, file_name=csv_name, mime="text/csv")
+
 
