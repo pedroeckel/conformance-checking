@@ -1,12 +1,14 @@
 # -*- coding: utf-8 -*-
 import streamlit as st
 from replayviz.loggen import build_xes_from_frequencies
+from pm4py import convert_to_dataframe
 
-st.set_page_config(page_title="Gerador de Logs XES", layout="wide")
-st.title("Gerador de Logs XES")
+st.set_page_config(page_title="Gerador de Logs XES/CSV", layout="wide")
+st.title("Gerador de Logs XES/CSV")
 
 st.markdown(
-    "Forneça rótulos de atividades e uma tabela de frequências de traços para gerar um log XES sintético."
+    "Forneça rótulos de atividades e uma tabela de frequências de traços para gerar um log sintético e baixá-lo em XES ou CSV."
+
 )
 
 default_labels = """a: register request
@@ -71,7 +73,12 @@ if st.button("Gerar Log"):
         activity_labels=act_labels or None,
         add_timestamps=add_timestamps,
     )
+    df = convert_to_dataframe(log)
+    csv_bytes = df.to_csv(index=False).encode("utf-8")
+    csv_name = out_path.rsplit(".", 1)[0] + ".csv"
     st.success(f"XES salvo em: {out_path}  - casos: {len(log)}")
     with open(out_path, "rb") as f:
         st.download_button("Baixar XES", data=f.read(), file_name=out_path)
+    st.download_button("Baixar CSV", data=csv_bytes, file_name=csv_name, mime="text/csv")
+
 

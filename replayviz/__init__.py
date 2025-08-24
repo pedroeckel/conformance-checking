@@ -23,4 +23,6 @@ from .flow_state import (
 # Geração de logs XES
 from .loggen import build_xes_from_frequencies
 
+
 from .utils_xes import read_xes_any
+
