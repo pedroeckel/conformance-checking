@@ -11,11 +11,15 @@ from replayviz import (
     markings_along_trace, markings_equal, format_marking,
     ensure_flow_state_slot, update_flow_state_slot, render_flow_slot,
 )
-from replayviz.flowviz import build_nodes_edges_for_marking_N3, build_trace_flow
+from replayviz.flowviz import (
+    build_normative_flow_N3,
+    build_nodes_edges_for_marking_N3,
+    build_trace_flow,
+)
 from replayviz.utils_xes import read_xes_any  # <- leitor robusto (path/bytes)
 
 st.set_page_config(page_title="Token Replay — N₃", layout="wide")
-st.title("Token-Based Replay (N₃) — fluxo do traço acima, Petri com fichas abaixo")
+st.title("Token-Based Replay (N₃) — normativo e fluxo do traço acima, Petri com fichas abaixo")
 
 # -----------------------------
 # Leitura de log (robusta)
@@ -86,7 +90,16 @@ if st.session_state.last_params != curr_params:
 st.session_state.frame = max(0, min(st.session_state.frame, max_step))
 
 # -----------------------------
-# 1) Fluxo do traço (alto nível)
+# 1) Normativo N₃ (alto nível)
+# -----------------------------
+st.subheader("Modelo normativo (referência)")
+n_nodes, n_edges = build_normative_flow_N3()
+ensure_flow_state_slot("flow_norm_on_replay_page")
+update_flow_state_slot("flow_norm_on_replay_page", n_nodes, n_edges)
+render_flow_slot("flow_norm_on_replay_page", key="norm_replay_page", height=260, fit_view=True)
+
+# -----------------------------
+# 2) Fluxo do traço (alto nível)
 # -----------------------------
 st.subheader("Fluxo do traço selecionado")
 nodes_top, edges_top = build_trace_flow(log[trace_idx])
@@ -97,7 +110,7 @@ render_flow_slot("flow_trace_overview", key="trace_overview", height=260, fit_vi
 st.markdown("---")
 
 # -----------------------------
-# 2) Controles + Petri com fichas
+# 3) Controles + Petri com fichas
 # -----------------------------
 st.subheader("Controles (somente manual)")
 c1, c2, c3 = st.columns([1, 1, 1])
@@ -134,7 +147,7 @@ st.markdown(f"Marcação atual: `{format_marking(marking)}`")
 st.markdown(f"Marcação final requerida: `{format_marking(fm)}`")
 
 # -----------------------------
-# 3) Métricas do Token-Based Replay
+# 4) Métricas do Token-Based Replay
 # -----------------------------
 st.subheader("Métricas do Token-Based Replay")
 
