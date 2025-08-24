@@ -7,13 +7,11 @@ from pm4py.objects.log.obj import EventLog
 from pm4py.algo.conformance.tokenreplay import algorithm as token_based_replay
 
 from replayviz.pm4py_model import build_tiny_log, build_net_N3
-from replayviz.flowviz import (
-    build_normative_flow_N3, build_nodes_edges_for_marking_N3
-)
 from replayviz import (
     markings_along_trace, markings_equal, format_marking,
     ensure_flow_state_slot, update_flow_state_slot, render_flow_slot,
 )
+from replayviz.flowviz import build_normative_flow_N3, build_nodes_edges_for_marking_N3
 
 st.set_page_config(page_title="Token Replay — N₃", layout="wide")
 st.title("Token-Based Replay (N₃) — normativo acima, Petri com fichas abaixo")
