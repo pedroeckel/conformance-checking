@@ -1,4 +1,6 @@
-streamlit>=1.31
+streamlit>=1.31,<2
+streamlit-flow-component>=1.6.1
 pm4py>=2.7
-streamlit-flow  # conforme o nome/versão usado no seu ambiente
 pandas>=2.0
+numpy>=1.23
+scipy>=1.10
