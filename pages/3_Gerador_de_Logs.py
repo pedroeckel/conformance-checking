@@ -91,11 +91,16 @@ if st.button("Gerar Log"):
         add_timestamps=add_timestamps,
     )
     df = convert_to_dataframe(log)
-    csv_bytes = df.to_csv(index=False).encode("utf-8")
-    csv_name = out_path.rsplit(".", 1)[0] + ".csv"
-    st.success(f"XES salvo em: {out_path}  - casos: {len(log)}")
+    csv_path = out_path.rsplit(".", 1)[0] + ".csv"
+    df.to_csv(csv_path, index=False)
+    st.success(
+        f"Logs salvos em: {out_path} (XES) e {csv_path} (CSV)  - casos: {len(log)}"
+    )
     with open(out_path, "rb") as f:
         st.download_button("Baixar XES", data=f.read(), file_name=out_path)
-    st.download_button("Baixar CSV", data=csv_bytes, file_name=csv_name, mime="text/csv")
+    with open(csv_path, "rb") as f:
+        st.download_button(
+            "Baixar CSV", data=f.read(), file_name=csv_path, mime="text/csv"
+        )
 
 
