@@ -85,8 +85,11 @@ curr_params = (trace_idx, max_step)
 if st.session_state.last_params != curr_params:
     st.session_state.last_params = curr_params
     st.session_state.frame = 0
+    # IMPORTANTE: zera os dois canvas ligados ao traço
     if "flow_trace_vertical_n3" in st.session_state:
         del st.session_state["flow_trace_vertical_n3"]
+    if "flow_trace_overview" in st.session_state:
+        del st.session_state["flow_trace_overview"]
 
 # Limita antes de instanciar o widget
 st.session_state.frame = max(0, min(st.session_state.frame, max_step))
@@ -100,16 +103,6 @@ ensure_flow_state_slot("flow_norm_on_replay_page")
 update_flow_state_slot("flow_norm_on_replay_page", n_nodes, n_edges)
 render_flow_slot("flow_norm_on_replay_page", key="norm_replay_page", height=260, fit_view=True)
 
-# -----------------------------
-# 2) Fluxo do traço (alto nível)
-# -----------------------------
-st.subheader("Fluxo do traço selecionado")
-nodes_top, edges_top = build_trace_flow(log[trace_idx])
-ensure_flow_state_slot("flow_trace_overview")
-update_flow_state_slot("flow_trace_overview", nodes_top, edges_top)
-render_flow_slot("flow_trace_overview", key="trace_overview", height=260, fit_view=True)
-
-st.markdown("---")
 
 # -----------------------------
 # 3) Controles + Petri com fichas
