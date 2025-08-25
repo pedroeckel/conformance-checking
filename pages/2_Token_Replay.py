@@ -140,11 +140,11 @@ st.markdown(badge + " &nbsp;&nbsp;|&nbsp;&nbsp; " + fired_txt)
 st.markdown(f"Marcação atual: `{format_marking(marking)}`")
 st.markdown(f"Marcação final requerida: `{format_marking(fm)}`")
 
-# -----------------------------
-# 4) Métricas do Token-Based Replay
-# -----------------------------
-st.subheader("Métricas do Token-Based Replay")
 
+# -----------------------------
+# 5) Variantes (agrupadas por sequência de eventos)
+# -----------------------------
+st.subheader("Variantes do processo (agrupadas por sequência de eventos)")
 def _scalar(x): return "—" if x is None else x
 def _name(obj) -> str: return getattr(obj, "name", str(obj))
 def _fmt_marking_like(val) -> str:
@@ -170,6 +170,66 @@ def _fmt_seq_of_transitions(val) -> str:
                 out.append(_name(x))
         return ", ".join(out)
     return _name(val)
+# Base por traço: acrescenta a string da variante (sequência de eventos)
+variant_rows: List[Dict[str, Any]] = []
+for i, (r, tr) in enumerate(zip(replay_result, log), start=1):
+    variant = " → ".join(ev["concept:name"] for ev in tr)
+    variant_rows.append({
+        "trace": i,
+        "variant": variant,
+        # métricas "cruas" para permitir agregação
+        "trace_is_fit": r.get("trace_is_fit"),
+        "trace_fitness": r.get("trace_fitness"),
+        "missing": r.get("missing_tokens"),
+        "remaining": r.get("remaining_tokens"),
+        "consumed": r.get("consumed_tokens"),
+        "produced": r.get("produced_tokens"),
+        # campos textuais representativos: usaremos a moda
+        "enabled_transitions": _fmt_seq_of_transitions(r.get("enabled_transitions_in_marking")),
+        "activated_transitions": _fmt_seq_of_transitions(r.get("activated_transitions")),
+        "transitions_with_problems": _fmt_seq_of_transitions(r.get("transitions_with_problems")),
+    })
+
+df_variants_base = pd.DataFrame(variant_rows)
+
+def _mode_or_dash(s: pd.Series) -> str:
+    """Moda robusta: retorna o valor mais frequente ou '—' se vazio."""
+    s = s.replace({None: pd.NA, "—": pd.NA})
+    m = s.mode(dropna=True)
+    return (m.iloc[0] if not m.empty else "—")
+
+# Agregação por variante
+df_variants = (
+    df_variants_base
+      .groupby("variant", dropna=False)
+      .agg(
+          frequency=("trace", "size"),
+          fit_rate=("trace_is_fit", lambda x: pd.Series(x, dtype="float").mean()),
+          trace_fitness_mean=("trace_fitness", "mean"),
+          missing_mean=("missing", "mean"),
+          remaining_mean=("remaining", "mean"),
+          consumed_mean=("consumed", "mean"),
+          produced_mean=("produced", "mean"),
+          enabled_transitions_mode=("enabled_transitions", _mode_or_dash),
+          activated_transitions_mode=("activated_transitions", _mode_or_dash),
+          transitions_with_problems_mode=("transitions_with_problems", _mode_or_dash),
+      )
+      .reset_index()
+      .sort_values(["frequency", "trace_fitness_mean"], ascending=[False, False])
+)
+
+# Formatação leve
+for c in ["fit_rate", "trace_fitness_mean", "missing_mean", "remaining_mean", "consumed_mean", "produced_mean"]:
+    df_variants[c] = df_variants[c].round(3)
+
+st.dataframe(df_variants, use_container_width=True)
+
+# -----------------------------
+# 4) Métricas do Token-Based Replay
+# -----------------------------
+st.subheader("Métricas do Token-Based Replay")
+
+
 
 rows: List[Dict[str, Any]] = []
 for i, r in enumerate(replay_result, start=1):
@@ -187,3 +247,4 @@ for i, r in enumerate(replay_result, start=1):
         "transitions_with_problems": _fmt_seq_of_transitions(r.get("transitions_with_problems")),
     })
 st.dataframe(pd.DataFrame(rows), use_container_width=True)
+
