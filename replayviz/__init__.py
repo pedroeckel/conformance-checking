@@ -13,6 +13,8 @@ from .markings import (
 from .flowviz import (
     build_nodes_edges_for_marking_N3,
     build_normative_flow_N3,
+    build_trace_flow,
+    build_trace_replay_flow,
 )
 
 # Estado do componente streamlit-flow
