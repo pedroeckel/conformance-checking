@@ -3,6 +3,7 @@ from pm4py.objects.petri_net.obj import PetriNet, Marking
 from pm4py.objects.log.obj import Trace
 from streamlit_flow.elements import StreamlitFlowNode, StreamlitFlowEdge
 import re
+import networkx as nx
 
 def _token_html(k: int, max_dots: int = 6) -> str:
     if k <= 0:
@@ -62,6 +63,40 @@ def _label_under(text: str) -> Tuple[str, int, int]:
         f"<div style='text-align:center;font-size:12px;line-height:14px;color:#111827'>{tx}</div>"
     )
     return html, width, height
+
+
+def _auto_layout(nodes: Dict[str, StreamlitFlowNode], edges: List[StreamlitFlowEdge]) -> None:
+    """Atribui coordenadas usando um layout de força do NetworkX."""
+    G = nx.DiGraph()
+    for nid in nodes:
+        G.add_node(nid)
+    for e in edges:
+        G.add_edge(e.source, e.target)
+
+    fixed_pos: Dict[str, Tuple[float, float]] = {}
+    fixed_nodes: List[str] = []
+    if "p_start" in nodes:
+        fixed_pos["p_start"] = (-1.5, 0.0)
+        fixed_nodes.append("p_start")
+    if "p_end" in nodes:
+        fixed_pos["p_end"] = (1.5, 0.0)
+        fixed_nodes.append("p_end")
+
+    if fixed_nodes:
+        pos = nx.spring_layout(G, seed=42, pos=fixed_pos, fixed=fixed_nodes)
+    else:
+        pos = nx.spring_layout(G, seed=42)
+
+    scale = 220
+    for nid, (x, y) in pos.items():
+        nodes[nid].pos = (float(x * scale), float(-y * scale))
+
+    # curvas para arestas que apontam para trás
+    for e in edges:
+        sx, _ = nodes[e.source].pos
+        tx, _ = nodes[e.target].pos
+        if sx > tx:
+            e.type = "smoothstep"
 
 def _layout_coords():
     """
@@ -194,7 +229,7 @@ def build_normative_flow_N3() -> Tuple[List[StreamlitFlowNode], List[StreamlitFl
 
 def build_trace_flow(trace: Trace) -> Tuple[List[StreamlitFlowNode], List[StreamlitFlowEdge]]:
     """Traço sequencial em estilo rede de Petri (lugares únicos)."""
-    nodes: List[StreamlitFlowNode] = []
+    nodes: Dict[str, StreamlitFlowNode] = {}
     edges: List[StreamlitFlowEdge] = []
 
     circle_style = {
@@ -205,26 +240,18 @@ def build_trace_flow(trace: Trace) -> Tuple[List[StreamlitFlowNode], List[Stream
         "background": "#fff",
     }
 
-    y = 60
-    x = 0
-
-    # lugar inicial
-    nodes.append(
-        StreamlitFlowNode(
-            id="p_start",
-            pos=(x, y),
-            data={"content": ""},
-            node_type="default",
-            source_position="right",
-            target_position="left",
-            style=circle_style,
-        )
+    nodes["p_start"] = StreamlitFlowNode(
+        id="p_start",
+        pos=(0, 0),
+        data={"content": ""},
+        node_type="default",
+        source_position="right",
+        target_position="left",
+        style=circle_style,
     )
 
     curr_place = "p_start"
-    next_x = 80
     edge_idx = 0
-
     trans_nodes: Dict[str, str] = {}
     place_after: Dict[str, str] = {}
 
@@ -232,41 +259,29 @@ def build_trace_flow(trace: Trace) -> Tuple[List[StreamlitFlowNode], List[Stream
         name = ev.get("concept:name", "?")
         slug = re.sub(r"[^0-9a-zA-Z_]+", "_", name)
 
-        # transição (caixa)
-        t_id = trans_nodes.get(name)
-        if t_id is None:
-            t_id = f"t_{slug}"
-            trans_nodes[name] = t_id
-            nodes.append(
-                StreamlitFlowNode(
-                    id=t_id,
-                    pos=(next_x, y),
-                    data={"content": f"<div><b>{name}</b></div>"},
-                    node_type="default",
-                    source_position="right",
-                    target_position="left",
-                    style=_trans_style(name, highlighted=False),
-                )
+        t_id = trans_nodes.setdefault(name, f"t_{slug}")
+        if t_id not in nodes:
+            nodes[t_id] = StreamlitFlowNode(
+                id=t_id,
+                pos=(0, 0),
+                data={"content": f"<div><b>{name}</b></div>"},
+                node_type="default",
+                source_position="right",
+                target_position="left",
+                style=_trans_style(name, highlighted=False),
             )
-            next_x += 80
 
-        # lugar após a transição
-        p_id = place_after.get(name)
-        if p_id is None:
-            p_id = f"p_{slug}"
-            place_after[name] = p_id
-            nodes.append(
-                StreamlitFlowNode(
-                    id=p_id,
-                    pos=(next_x, y),
-                    data={"content": ""},
-                    node_type="default",
-                    source_position="right",
-                    target_position="left",
-                    style=circle_style,
-                )
+        p_id = place_after.setdefault(name, f"p_{slug}")
+        if p_id not in nodes:
+            nodes[p_id] = StreamlitFlowNode(
+                id=p_id,
+                pos=(0, 0),
+                data={"content": ""},
+                node_type="default",
+                source_position="right",
+                target_position="left",
+                style=circle_style,
             )
-            next_x += 80
 
         edges.append(StreamlitFlowEdge(id=f"e_{edge_idx}", source=curr_place, target=t_id, label="", animated=False))
         edge_idx += 1
@@ -274,28 +289,19 @@ def build_trace_flow(trace: Trace) -> Tuple[List[StreamlitFlowNode], List[Stream
         edge_idx += 1
         curr_place = p_id
 
-    nodes.append(
-        StreamlitFlowNode(
-            id="p_end",
-            pos=(next_x, y),
-            data={"content": ""},
-            node_type="default",
-            source_position="right",
-            target_position="left",
-            style=circle_style,
-        )
+    nodes["p_end"] = StreamlitFlowNode(
+        id="p_end",
+        pos=(0, 0),
+        data={"content": ""},
+        node_type="default",
+        source_position="right",
+        target_position="left",
+        style=circle_style,
     )
-    edges.append(
-        StreamlitFlowEdge(
-            id=f"e_{edge_idx}",
-            source=curr_place,
-            target="p_end",
-            label="",
-            animated=False,
-        )
-    )
+    edges.append(StreamlitFlowEdge(id=f"e_{edge_idx}", source=curr_place, target="p_end", label="", animated=False))
 
-    return nodes, edges
+    _auto_layout(nodes, edges)
+    return list(nodes.values()), edges
 
 
 def build_trace_replay_flow(
@@ -312,23 +318,18 @@ def build_trace_replay_flow(
         "background": "#fff",
     }
 
-    y = 60
-    next_x = 0
-
     nodes: Dict[str, StreamlitFlowNode] = {}
     edges: List[StreamlitFlowEdge] = []
 
-    # nó inicial
     nodes["p_start"] = StreamlitFlowNode(
         id="p_start",
-        pos=(next_x, y),
+        pos=(0, 0),
         data={"content": ""},
         node_type="default",
         source_position="right",
         target_position="left",
         style=circle_style,
     )
-    next_x += 80
 
     trans_nodes: Dict[str, str] = {}
     place_after: Dict[str, str] = {}
@@ -342,35 +343,29 @@ def build_trace_replay_flow(
         name = ev.get("concept:name", "?")
         slug = re.sub(r"[^0-9a-zA-Z_]+", "_", name)
 
-        t_id = trans_nodes.get(name)
-        if t_id is None:
-            t_id = f"t_{slug}"
-            trans_nodes[name] = t_id
+        t_id = trans_nodes.setdefault(name, f"t_{slug}")
+        if t_id not in nodes:
             nodes[t_id] = StreamlitFlowNode(
                 id=t_id,
-                pos=(next_x, y),
+                pos=(0, 0),
                 data={"content": f"<div><b>{name}</b></div>"},
                 node_type="default",
                 source_position="right",
                 target_position="left",
                 style=_trans_style(name, highlighted=False),
             )
-            next_x += 80
 
-        p_id = place_after.get(name)
-        if p_id is None:
-            p_id = f"p_{slug}"
-            place_after[name] = p_id
+        p_id = place_after.setdefault(name, f"p_{slug}")
+        if p_id not in nodes:
             nodes[p_id] = StreamlitFlowNode(
                 id=p_id,
-                pos=(next_x, y),
+                pos=(0, 0),
                 data={"content": ""},
                 node_type="default",
                 source_position="right",
                 target_position="left",
                 style=circle_style,
             )
-            next_x += 80
 
         edges.append(StreamlitFlowEdge(id=f"e_{edge_idx}", source=curr_place, target=t_id, label="", animated=False))
         edge_idx += 1
@@ -383,7 +378,7 @@ def build_trace_replay_flow(
 
     nodes["p_end"] = StreamlitFlowNode(
         id="p_end",
-        pos=(next_x, y),
+        pos=(0, 0),
         data={"content": ""},
         node_type="default",
         source_position="right",
@@ -400,6 +395,8 @@ def build_trace_replay_flow(
         )
     )
     place_seq.append("p_end")
+
+    _auto_layout(nodes, edges)
 
     # determina token e destaques
     step = max(0, min(step, len(place_seq) - 1))
