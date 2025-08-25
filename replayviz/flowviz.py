@@ -297,3 +297,131 @@ def build_trace_flow(trace: Trace) -> Tuple[List[StreamlitFlowNode], List[Stream
 
     return nodes, edges
 
+
+def build_trace_replay_flow(
+    trace: Trace,
+    step: int,
+    fired_event_label: Optional[str] = None,
+) -> Tuple[List[StreamlitFlowNode], List[StreamlitFlowEdge]]:
+    """Fluxo do traço com marcação (1 token) no passo informado."""
+    circle_style = {
+        "border": "2px solid #6b7280",
+        "borderRadius": "9999px",
+        "width": 28,
+        "height": 28,
+        "background": "#fff",
+    }
+
+    y = 60
+    next_x = 0
+
+    nodes: Dict[str, StreamlitFlowNode] = {}
+    edges: List[StreamlitFlowEdge] = []
+
+    # nó inicial
+    nodes["p_start"] = StreamlitFlowNode(
+        id="p_start",
+        pos=(next_x, y),
+        data={"content": ""},
+        node_type="default",
+        source_position="right",
+        target_position="left",
+        style=circle_style,
+    )
+    next_x += 80
+
+    trans_nodes: Dict[str, str] = {}
+    place_after: Dict[str, str] = {}
+    place_seq: List[str] = ["p_start"]
+    trans_seq: List[str] = []
+
+    curr_place = "p_start"
+    edge_idx = 0
+
+    for ev in trace:
+        name = ev.get("concept:name", "?")
+        slug = re.sub(r"[^0-9a-zA-Z_]+", "_", name)
+
+        t_id = trans_nodes.get(name)
+        if t_id is None:
+            t_id = f"t_{slug}"
+            trans_nodes[name] = t_id
+            nodes[t_id] = StreamlitFlowNode(
+                id=t_id,
+                pos=(next_x, y),
+                data={"content": f"<div><b>{name}</b></div>"},
+                node_type="default",
+                source_position="right",
+                target_position="left",
+                style=_trans_style(name, highlighted=False),
+            )
+            next_x += 80
+
+        p_id = place_after.get(name)
+        if p_id is None:
+            p_id = f"p_{slug}"
+            place_after[name] = p_id
+            nodes[p_id] = StreamlitFlowNode(
+                id=p_id,
+                pos=(next_x, y),
+                data={"content": ""},
+                node_type="default",
+                source_position="right",
+                target_position="left",
+                style=circle_style,
+            )
+            next_x += 80
+
+        edges.append(StreamlitFlowEdge(id=f"e_{edge_idx}", source=curr_place, target=t_id, label="", animated=False))
+        edge_idx += 1
+        edges.append(StreamlitFlowEdge(id=f"e_{edge_idx}", source=t_id, target=p_id, label="", animated=False))
+        edge_idx += 1
+
+        curr_place = p_id
+        place_seq.append(p_id)
+        trans_seq.append(t_id)
+
+    nodes["p_end"] = StreamlitFlowNode(
+        id="p_end",
+        pos=(next_x, y),
+        data={"content": ""},
+        node_type="default",
+        source_position="right",
+        target_position="left",
+        style=circle_style,
+    )
+    edges.append(
+        StreamlitFlowEdge(
+            id=f"e_{edge_idx}",
+            source=curr_place,
+            target="p_end",
+            label="",
+            animated=False,
+        )
+    )
+    place_seq.append("p_end")
+
+    # determina token e destaques
+    step = max(0, min(step, len(place_seq) - 1))
+    curr_place_id = place_seq[step]
+    prev_place_id = place_seq[step - 1] if step > 0 else None
+    fired_label = fired_event_label
+    if fired_label is None and step > 0 and step - 1 < len(trace):
+        fired_label = trace[step - 1].get("concept:name")
+
+    for pid, node in nodes.items():
+        if pid.startswith("p_"):
+            tokens = 1 if pid == curr_place_id else 0
+            consumed = pid == prev_place_id
+            produced = pid == curr_place_id and step > 0
+            node.data = {"content": _token_html(tokens)}
+            node.style = _place_style(tokens, consumed=consumed, produced=produced)
+
+    for name, t_id in trans_nodes.items():
+        node = nodes[t_id]
+        highlight = (name == fired_label)
+        node.style = _trans_style(name, highlighted=highlight)
+
+    return list(nodes.values()), edges
+
+

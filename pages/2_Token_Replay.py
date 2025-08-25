@@ -13,8 +13,8 @@ from replayviz import (
 )
 from replayviz.flowviz import (
     build_normative_flow_N3,
-    build_nodes_edges_for_marking_N3,
     build_trace_flow,
+    build_trace_replay_flow,
 )
 from replayviz.utils_xes import read_xes_any  # <- leitor robusto (path/bytes)
 
@@ -85,6 +85,8 @@ curr_params = (trace_idx, max_step)
 if st.session_state.last_params != curr_params:
     st.session_state.last_params = curr_params
     st.session_state.frame = 0
+    if "flow_trace_vertical_n3" in st.session_state:
+        del st.session_state["flow_trace_vertical_n3"]
 
 # Limita antes de instanciar o widget
 st.session_state.frame = max(0, min(st.session_state.frame, max_step))
@@ -127,13 +129,12 @@ st.slider("Passo", 0, max_step, key="frame", help="0 = estado inicial")
 st.subheader(f"Replay do Trace {trace_idx+1} — passo {st.session_state.frame}/{max_step}")
 st.markdown("**Traço selecionado:** " + " → ".join(ev["concept:name"] for ev in log[trace_idx]))
 
-prev_marking = seq[st.session_state.frame - 1][1] if st.session_state.frame > 0 else None
 _, marking, fired_name = seq[st.session_state.frame]
 
-nodes, edges = build_nodes_edges_for_marking_N3(
-    net=net, places=places, trans=trans, marking=marking,
-    fired_transition_name=(fired_name if st.session_state.frame > 0 else None),
-    prev_marking=prev_marking
+nodes, edges = build_trace_replay_flow(
+    trace=log[trace_idx],
+    step=st.session_state.frame,
+    fired_event_label=(fired_name if st.session_state.frame > 0 else None),
 )
 ensure_flow_state_slot("flow_trace_vertical_n3")
 update_flow_state_slot("flow_trace_vertical_n3", nodes, edges)
