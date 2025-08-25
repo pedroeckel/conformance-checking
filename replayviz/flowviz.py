@@ -231,6 +231,7 @@ def build_trace_flow(trace: Trace) -> Tuple[List[StreamlitFlowNode], List[Stream
     """Traço sequencial em estilo rede de Petri (lugares únicos)."""
     nodes: Dict[str, StreamlitFlowNode] = {}
     edges: List[StreamlitFlowEdge] = []
+    order: Dict[str, int] = {}
 
     circle_style = {
         "border": "2px solid #6b7280",
@@ -249,6 +250,8 @@ def build_trace_flow(trace: Trace) -> Tuple[List[StreamlitFlowNode], List[Stream
         target_position="left",
         style=circle_style,
     )
+    order["p_start"] = 0
+    idx = 1
 
     curr_place = "p_start"
     edge_idx = 0
@@ -270,6 +273,7 @@ def build_trace_flow(trace: Trace) -> Tuple[List[StreamlitFlowNode], List[Stream
                 target_position="left",
                 style=_trans_style(name, highlighted=False),
             )
+            order.setdefault(t_id, idx); idx += 1
 
         p_id = place_after.setdefault(name, f"p_{slug}")
         if p_id not in nodes:
@@ -282,6 +286,7 @@ def build_trace_flow(trace: Trace) -> Tuple[List[StreamlitFlowNode], List[Stream
                 target_position="left",
                 style=circle_style,
             )
+            order.setdefault(p_id, idx); idx += 1
 
         edges.append(StreamlitFlowEdge(id=f"e_{edge_idx}", source=curr_place, target=t_id, label="", animated=False))
         edge_idx += 1
@@ -298,9 +303,21 @@ def build_trace_flow(trace: Trace) -> Tuple[List[StreamlitFlowNode], List[Stream
         target_position="left",
         style=circle_style,
     )
+    order.setdefault("p_end", idx)
     edges.append(StreamlitFlowEdge(id=f"e_{edge_idx}", source=curr_place, target="p_end", label="", animated=False))
 
-    _auto_layout(nodes, edges)
+    spacing = 120
+    for nid, node in nodes.items():
+        x = order.get(nid, 0) * spacing
+        y = 0.0 if nid.startswith("t") else 80.0
+        node.pos = (float(x), float(y))
+
+    for e in edges:
+        sx = nodes[e.source].pos[0]
+        tx = nodes[e.target].pos[0]
+        if sx >= tx:
+            e.type = "smoothstep"
+
     return list(nodes.values()), edges
 
 
@@ -320,6 +337,7 @@ def build_trace_replay_flow(
 
     nodes: Dict[str, StreamlitFlowNode] = {}
     edges: List[StreamlitFlowEdge] = []
+    order: Dict[str, int] = {}
 
     nodes["p_start"] = StreamlitFlowNode(
         id="p_start",
@@ -330,6 +348,7 @@ def build_trace_replay_flow(
         target_position="left",
         style=circle_style,
     )
+    order["p_start"] = 0
 
     trans_nodes: Dict[str, str] = {}
     place_after: Dict[str, str] = {}
@@ -338,6 +357,7 @@ def build_trace_replay_flow(
 
     curr_place = "p_start"
     edge_idx = 0
+    idx = 1
 
     for ev in trace:
         name = ev.get("concept:name", "?")
@@ -354,6 +374,7 @@ def build_trace_replay_flow(
                 target_position="left",
                 style=_trans_style(name, highlighted=False),
             )
+            order.setdefault(t_id, idx); idx += 1
 
         p_id = place_after.setdefault(name, f"p_{slug}")
         if p_id not in nodes:
@@ -366,6 +387,7 @@ def build_trace_replay_flow(
                 target_position="left",
                 style=circle_style,
             )
+            order.setdefault(p_id, idx); idx += 1
 
         edges.append(StreamlitFlowEdge(id=f"e_{edge_idx}", source=curr_place, target=t_id, label="", animated=False))
         edge_idx += 1
@@ -385,6 +407,7 @@ def build_trace_replay_flow(
         target_position="left",
         style=circle_style,
     )
+    order.setdefault("p_end", idx)
     edges.append(
         StreamlitFlowEdge(
             id=f"e_{edge_idx}",
@@ -396,7 +419,17 @@ def build_trace_replay_flow(
     )
     place_seq.append("p_end")
 
-    _auto_layout(nodes, edges)
+    spacing = 120
+    for nid, node in nodes.items():
+        x = order.get(nid, 0) * spacing
+        y = 0.0 if nid.startswith("t") else 80.0
+        node.pos = (float(x), float(y))
+
+    for e in edges:
+        sx = nodes[e.source].pos[0]
+        tx = nodes[e.target].pos[0]
+        if sx >= tx:
+            e.type = "smoothstep"
 
     # determina token e destaques
     step = max(0, min(step, len(place_seq) - 1))
