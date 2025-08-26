@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 import streamlit as st
+from datetime import date, datetime, time, timedelta
 from replayviz.loggen import build_xes_from_frequencies
 from pm4py import convert_to_dataframe
 
@@ -80,15 +81,29 @@ freqs_txt = st.text_area(
 )
 out_path = st.text_input("Arquivo de saída", "Lfull.xes")
 add_timestamps = st.checkbox("Gerar timestamps sintéticos", True)
+start_date = st.date_input("Data inicial", value=date.today())
+end_date = st.date_input("Data final", value=date.today())
+gap_days = st.number_input(
+    "Diferença entre atividades (dias)", min_value=0.0, value=1.0
+)
 
 if st.button("Gerar Log"):
     act_labels = parse_labels(labels_txt)
     freqs = parse_freqs(freqs_txt)
+    base_dt = datetime.combine(start_date, time())
+    total_cases = sum(freq for freq, _ in freqs)
+    if end_date > start_date and total_cases > 0:
+        delta_cases = (datetime.combine(end_date, time()) - base_dt) / total_cases
+    else:
+        delta_cases = timedelta(minutes=3)
     log = build_xes_from_frequencies(
         freqs,
         out_path=out_path,
         activity_labels=act_labels or None,
         add_timestamps=add_timestamps,
+        base_time=base_dt,
+        delta_between_events=timedelta(days=gap_days),
+        delta_between_cases=delta_cases,
     )
     df = convert_to_dataframe(log)
     csv_path = out_path.rsplit(".", 1)[0] + ".csv"
